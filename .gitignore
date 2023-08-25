@@ -1,0 +1,8 @@
+.cache/
+obj/
+
+# LSP
+compile_commands.json
+
+# Ejecutable
+server.exe
