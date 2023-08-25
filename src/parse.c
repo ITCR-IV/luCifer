@@ -9,7 +9,7 @@ static char doc[] = "luCifer -- server that accepts and processes images";
 static char args_doc[] = "";
 
 static struct argp_option options[] = {
-    {"port", 'p', "PORT", 0, "Specify a different port (default: 8888)", 0},
+    {"port", 'p', "PORT", 0, "Specify a different port (default: 1717)", 0},
     {0},
 };
 
@@ -51,7 +51,7 @@ struct arguments parse(int argc, char **argv) {
   struct arguments arguments;
 
   /* Default values. */
-  arguments.port = 8888;
+  arguments.port = 1717;
 
   error_t ret = argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
