@@ -60,7 +60,5 @@ struct arguments parse(int argc, char **argv) {
     exit(ret);
   }
 
-  printf("port = %d\n", arguments.port);
-
   return arguments;
 }
