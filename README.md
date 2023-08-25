@@ -18,3 +18,9 @@ Si utiliza el LSP `clangd` puede compilar el `compile_commands.json` utilizando 
 ```
 make clean; bear -- make
 ```
+
+## Ejemplo de envío de archivos
+
+```
+curl 'http://localhost:8888/' --data-binary ~/Downloads/funny.mp4
+```
