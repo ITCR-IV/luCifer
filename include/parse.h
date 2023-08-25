@@ -1,3 +1,6 @@
+#ifndef PARSE_H
+#define PARSE_H
+
 #include <stdint.h>
 
 struct arguments {
@@ -5,3 +8,5 @@ struct arguments {
 };
 
 struct arguments parse(int argc, char **argv);
+
+#endif
