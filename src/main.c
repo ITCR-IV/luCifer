@@ -10,8 +10,9 @@ int main(int argc, char **argv) {
 
   struct MHD_Daemon *daemon;
 
-  daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD, args.port, NULL,
-                            NULL, &connection_handler, NULL, MHD_OPTION_END);
+  daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD, args.port,
+                            &on_client_connect, NULL, &connection_handler,
+                            &request_completed, MHD_OPTION_END);
   if (NULL == daemon) {
     fprintf(stderr, "Failed to start server daemon");
     return ECONNREFUSED;
