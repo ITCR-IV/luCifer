@@ -1,18 +1,18 @@
 CC=gcc
-CFLAGS=-g -I$(IDIR)
+CFLAGS=-g -I$(IDIR) -Wall -Wextra
 
 IDIR=include
 ODIR=obj
 SRCDIR=src
 
-LIBS=-lm
+LIBS=-lmicrohttpd
 
 # Headers dentro de include/
-_DEPS =
+_DEPS = parse.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 # Object files (.o) que haya que compilar 
-_OBJ = main.o
+_OBJ = main.o parse.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(DEPS)
