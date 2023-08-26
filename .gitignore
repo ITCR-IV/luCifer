@@ -6,3 +6,7 @@ compile_commands.json
 
 # Ejecutable
 server.exe
+
+# Dirs donde guarda cosas por default
+colors/
+equalized/
