@@ -17,7 +17,7 @@ echo "                    en el color más predominante"
 echo ""
 
 while true; do
-	read -rp "> " COMMAND
+	read -erp "> " COMMAND
 
 	if [ -n "$COMMAND" ]; then
 		BASE_CMD=$(echo "$COMMAND" | awk '{print $1;}')
