@@ -5,6 +5,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "process_image.h"
+
 #define DEFAULT_PORT 1717
 #define DEFAULT_CONFIG "/etc/server/config.conf"
 #define DEFAULT_COLORS_DIR "colors"
@@ -274,19 +276,24 @@ struct configuration parse_conf(struct arguments args) {
       } else if (strcmp(key, COLORS_PATH_KEY) == 0) {
         create_dir(value);
 
-        char *green_dir = malloc(strlen(value) + strlen("verdes") + 1);
-        char *red_dir = malloc(strlen(value) + strlen("rojas") + 1);
-        char *blue_dir = malloc(strlen(value) + strlen("azules") + 1);
+        char *green_dir = malloc(strlen(value) + strlen(GREEN_COLOR_DIR) + 1);
+        char *red_dir = malloc(strlen(value) + strlen(RED_COLOR_DIR) + 1);
+        char *blue_dir = malloc(strlen(value) + strlen(BLUE_COLOR_DIR) + 1);
 
-        sprintf(green_dir, "%s/verdes", value);
-        sprintf(red_dir, "%s/rojas", value);
-        sprintf(blue_dir, "%s/azules", value);
+        sprintf(green_dir, "%s/%s", value, GREEN_COLOR_DIR);
+        sprintf(red_dir, "%s/%s", value, RED_COLOR_DIR);
+        sprintf(blue_dir, "%s/%s", value, BLUE_COLOR_DIR);
 
         create_dir(green_dir);
         create_dir(red_dir);
         create_dir(blue_dir);
 
+        free(green_dir);
+        free(red_dir);
+        free(blue_dir);
+
         config.dl_colors_path = malloc(strlen(value) + 1);
+
         strcpy((char *)config.dl_colors_path, value);
 
       } else if (strcmp(key, EQU_PATH_KEY) == 0) {

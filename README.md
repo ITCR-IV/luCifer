@@ -3,10 +3,11 @@
 ## Requerimientos
 - glibc (para `argp`)
 - Instalar [`libmicrohttpd`](https://www.gnu.org/software/libmicrohttpd/)
+- Instalar [`freeimage`](https://freeimage.sourceforge.io/)
 
 Por ejemplo en arch linux:
 ```
-sudo pacman -S libmicrohttpd
+sudo pacman -S libmicrohttpd freeimage
 ```
 
 ## Instrucciones de uso

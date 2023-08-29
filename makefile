@@ -5,14 +5,14 @@ IDIR=include
 ODIR=obj
 SRCDIR=src
 
-LIBS=-lmicrohttpd
+LIBS=-lmicrohttpd -lfreeimage
 
 # Headers dentro de include/
-_DEPS = parse.h connection_handler.h
+_DEPS = parse.h connection_handler.h process_image.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 # Object files (.o) que haya que compilar 
-_OBJ = main.o parse.o connection_handler.o
+_OBJ = main.o parse.o connection_handler.o process_image.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(DEPS)

@@ -10,6 +10,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include "parse.h"
+#include "process_image.h"
 #include "util.h"
 
 #define POSTBUFFERSIZE 65536
@@ -20,14 +22,11 @@ enum ConnectionType {
   POST,
 };
 
-static unsigned int nr_of_uploading_clients = 0;
-
 const char *busypage =
     "<html><body>This server is busy, please try again later.</body></html>";
 const char *askpage = "<html><body>\n\
                        Upload a file, please!<br>\n\
-                       There are %u clients uploading at the moment.<br>\n\
-                       <form action=\"/filepost\" method=\"post\" \
+                       <form action=\"/equalize\" method=\"post\" \
                          enctype=\"multipart/form-data\">\n\
                        <input name=\"file\" type=\"file\">\n\
                        <input type=\"submit\" value=\" Send \"></form>\n\
@@ -40,24 +39,16 @@ const char *fileexistspage =
     "<html><body>This file already exists.</body></html>";
 const char *errorpage =
     "<html><body>This doesn't seem to be right.</body></html>";
+const char *unknownpathpage = "<html><body>404 Page Not Found.</body></html>";
 
-enum MHD_Result print_out_key(void *cls, enum MHD_ValueKind kind,
-                              const char *key, const char *value) {
-
-  UNUSED(cls);
-  UNUSED(kind);
-
-  printf("%s: %s\n", key, value);
-  return MHD_YES;
-}
-
-enum MHD_Result send_page(struct MHD_Connection *connection, const char *page,
-                          unsigned int status_code) {
+enum MHD_Result send_response(struct MHD_Connection *connection,
+                              const char *page, unsigned int status_code) {
   struct MHD_Response *response = MHD_create_response_from_buffer(
       strlen(page), (void *)page, MHD_RESPMEM_MUST_COPY);
 
-  if (!response)
+  if (!response) {
     return MHD_NO;
+  }
 
   enum MHD_Result ret = MHD_queue_response(connection, status_code, response);
   MHD_destroy_response(response);
@@ -72,7 +63,7 @@ enum MHD_Result on_client_connect(void *cls, const struct sockaddr *addr,
 
   struct in_addr address = ((struct sockaddr_in *)addr)->sin_addr;
 
-  printf("\nIP: %s\n", inet_ntoa(address));
+  printf("\nNew client connection with IP: %s\n", inet_ntoa(address));
 
   return MHD_YES;
 }
@@ -80,9 +71,12 @@ enum MHD_Result on_client_connect(void *cls, const struct sockaddr *addr,
 struct connection_info_struct {
   enum ConnectionType connectiontype;
   FILE *fp;
+  const char *tmp_filename;
   struct MHD_PostProcessor *postprocessor;
   const char *answerstring;
   unsigned int answercode;
+  const struct configuration *config;
+  enum ImageOperation operation;
 };
 
 static enum MHD_Result iterate_post(void *coninfo_cls, enum MHD_ValueKind kind,
@@ -110,22 +104,32 @@ static enum MHD_Result iterate_post(void *coninfo_cls, enum MHD_ValueKind kind,
 
   FILE *fp;
 
+  // On first iteration
   if (!con_info->fp) {
-    if (NULL != (fp = fopen(filename, "rb"))) {
+    const char *tmp_filename = malloc(strlen(filename) + 2);
+    sprintf((char *)tmp_filename, ".%s", filename);
+
+    if (NULL != (fp = fopen(tmp_filename, "rb"))) {
       fclose(fp);
       con_info->answerstring = fileexistspage;
       con_info->answercode = MHD_HTTP_FORBIDDEN;
       return MHD_NO;
     }
 
-    con_info->fp = fopen(filename, "ab");
+    con_info->fp = fopen(tmp_filename, "ab");
+    con_info->tmp_filename = tmp_filename;
+
     if (!con_info->fp) {
+      con_info->answerstring = servererrorpage;
+      con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
       return MHD_NO;
     }
   }
 
   if (size > 0) {
     if (!fwrite(data, sizeof(char), size, con_info->fp)) {
+      con_info->answerstring = servererrorpage;
+      con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
       return MHD_NO;
     }
   }
@@ -150,15 +154,105 @@ void request_completed(void *cls, struct MHD_Connection *connection,
   if (con_info->connectiontype == POST) {
     if (NULL != con_info->postprocessor) {
       MHD_destroy_post_processor(con_info->postprocessor);
-      nr_of_uploading_clients--;
     }
 
     if (con_info->fp)
       fclose(con_info->fp);
   }
 
+  if (con_info->tmp_filename != NULL) {
+    FILE *fp;
+    if (NULL != (fp = fopen(con_info->tmp_filename, "rb"))) {
+      fclose(fp);
+      remove(con_info->tmp_filename);
+    }
+    free((void *)con_info->tmp_filename);
+  }
+
   free(con_info);
   *con_cls = NULL;
+}
+
+void final_processing(struct connection_info_struct *con_info) {
+
+  if (con_info->tmp_filename == NULL) {
+    return;
+  }
+
+  // Get image format
+  FREE_IMAGE_FORMAT image_format =
+      FreeImage_GetFileType(con_info->tmp_filename, 0);
+  if (image_format == FIF_UNKNOWN) {
+    // try to guess the file format from the file extension
+    image_format = FreeImage_GetFIFFromFilename(con_info->tmp_filename);
+  }
+  FIBITMAP *dib;
+
+  // Load image
+  if ((image_format != FIF_UNKNOWN) &&
+      FreeImage_FIFSupportsReading(image_format)) {
+
+    fclose(con_info->fp);
+    con_info->fp = NULL;
+
+    dib = FreeImage_Load(image_format, con_info->tmp_filename, 0);
+  } else {
+    printf("image format unknown?\n");
+    con_info->answerstring = errorpage;
+    con_info->answercode = MHD_HTTP_BAD_REQUEST;
+    return;
+  }
+
+  if (dib == NULL) {
+    printf("Couldn't load image\n");
+    con_info->answerstring = servererrorpage;
+    con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+    return;
+  }
+
+  remove(con_info->tmp_filename);
+
+  // TODO: post-process (check operation, process image, save final file,
+  // delete tmp file)
+  const char *full_pathname;
+
+  switch (con_info->operation) {
+  case CLASSIFY_RGB:;
+    enum DominantColor color = get_dominant_color(dib);
+    full_pathname = malloc(strlen(con_info->config->dl_colors_path) +
+                           strlen(&(con_info->tmp_filename[1])) +
+                           strlen(get_dominant_color_subdir(color)) + 3);
+    sprintf((char *)full_pathname, "%s/%s/%s", con_info->config->dl_colors_path,
+            get_dominant_color_subdir(color), &(con_info->tmp_filename[1]));
+
+    break;
+  case EQUALIZE_HISTOGRAM:
+    equalize_histogram(dib);
+
+    full_pathname = malloc(strlen(con_info->config->dl_equalizer_path) +
+                           strlen(&(con_info->tmp_filename[1])) + 2);
+    sprintf((char *)full_pathname, "%s/%s", con_info->config->dl_equalizer_path,
+            &(con_info->tmp_filename[1]));
+
+    break;
+  default:
+    con_info->answerstring = servererrorpage;
+    con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+    FreeImage_Unload(dib);
+    return;
+  }
+
+  FILE *fp;
+  if (NULL != (fp = fopen(full_pathname, "rb"))) {
+    fclose(fp);
+    con_info->answerstring = fileexistspage;
+    con_info->answercode = MHD_HTTP_FORBIDDEN;
+    return;
+  }
+  FreeImage_Save(image_format, dib, full_pathname, 0);
+
+  free((void *)full_pathname);
+  FreeImage_Unload(dib);
 }
 
 enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
@@ -166,16 +260,9 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
                                    const char *version, const char *upload_data,
                                    size_t *upload_data_size, void **con_cls) {
 
-  UNUSED(cls);
-
   // Primera conexión
   if (*con_cls == NULL) {
-    printf("New %s request for %s using version %s\n", method, url, version);
-    MHD_get_connection_values(connection, MHD_HEADER_KIND | MHD_POSTDATA_KIND,
-                              &print_out_key, NULL);
-
-    if (nr_of_uploading_clients >= MAXCLIENTS)
-      return send_page(connection, busypage, MHD_HTTP_SERVICE_UNAVAILABLE);
+    printf("%s request for %s using version %s\n", method, url, version);
 
     struct connection_info_struct *con_info =
         malloc(sizeof(struct connection_info_struct));
@@ -184,10 +271,19 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
       return MHD_NO;
     }
 
+    con_info->config = cls;
     con_info->answerstring = NULL;
+    con_info->tmp_filename = NULL;
     con_info->fp = 0;
 
     if (0 == strcmp(method, "POST")) {
+      if (0 == strcmp(url, "/equalize")) {
+        con_info->operation = EQUALIZE_HISTOGRAM;
+
+      } else if (0 == strcmp(url, "/classify/rgb")) {
+        con_info->operation = CLASSIFY_RGB;
+      }
+
       con_info->postprocessor = MHD_create_post_processor(
           connection, POSTBUFFERSIZE, iterate_post, (void *)con_info);
 
@@ -195,8 +291,6 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
         free(con_info);
         return MHD_NO;
       }
-
-      nr_of_uploading_clients++;
 
       con_info->connectiontype = POST;
       con_info->answercode = MHD_HTTP_OK;
@@ -209,13 +303,15 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
   }
 
   if (strcmp(method, "GET") == 0) {
-    char buffer[1024];
-
-    sprintf(buffer, askpage, nr_of_uploading_clients);
-    return send_page(connection, buffer, MHD_HTTP_OK);
+    return send_response(connection, askpage, MHD_HTTP_OK);
   }
 
   if (strcmp(method, "POST") == 0) {
+
+    if (!(0 == strcmp(url, "/equalize")) &&
+        !(0 == strcmp(url, "/classify/rgb"))) {
+      return send_response(connection, errorpage, MHD_HTTP_NOT_FOUND);
+    }
 
     struct connection_info_struct *con_info = *con_cls;
 
@@ -224,10 +320,15 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
       *upload_data_size = 0;
 
       return MHD_YES;
-    } else if (NULL != con_info->answerstring)
-      return send_page(connection, con_info->answerstring,
-                       con_info->answercode);
+    } else if (NULL != con_info->answerstring) {
+
+      // Here do final processing before completing response
+      final_processing(con_info);
+
+      return send_response(connection, con_info->answerstring,
+                           con_info->answercode);
+    }
   }
 
-  return send_page(connection, errorpage, MHD_HTTP_BAD_REQUEST);
+  return send_response(connection, errorpage, MHD_HTTP_BAD_REQUEST);
 }
