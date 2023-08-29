@@ -22,8 +22,6 @@ enum ConnectionType {
   POST,
 };
 
-const char *busypage =
-    "<html><body>This server is busy, please try again later.</body></html>";
 const char *askpage = "<html><body>\n\
                        Upload a file, please!<br>\n\
                        <form action=\"/equalize\" method=\"post\" \
@@ -31,15 +29,13 @@ const char *askpage = "<html><body>\n\
                        <input name=\"file\" type=\"file\">\n\
                        <input type=\"submit\" value=\" Send \"></form>\n\
                        </body></html>";
-const char *completepage =
-    "<html><body>The upload has been completed.</body></html>";
-const char *servererrorpage =
-    "<html><body>An internal server error has occurred.</body></html>";
-const char *fileexistspage =
-    "<html><body>This file already exists.</body></html>";
-const char *errorpage =
-    "<html><body>This doesn't seem to be right.</body></html>";
-const char *unknownpathpage = "<html><body>404 Page Not Found.</body></html>";
+const char *complete_response = "The upload has been completed.";
+const char *server_error_response =
+    "500 An internal server error has occurred.";
+const char *file_exists_response = "This file already exists.";
+const char *bad_request_response = "This doesn't seem to be right.";
+const char *unrecognized_image_response = "Unrecognized image format.";
+const char *not_found_response = "404 Page Not Found.";
 
 enum MHD_Result send_response(struct MHD_Connection *connection,
                               const char *page, unsigned int status_code) {
@@ -94,7 +90,7 @@ static enum MHD_Result iterate_post(void *coninfo_cls, enum MHD_ValueKind kind,
   struct connection_info_struct *con_info = coninfo_cls;
 
   // Por default si algo sale mal se devuelve este error
-  con_info->answerstring = servererrorpage;
+  con_info->answerstring = server_error_response;
   con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
   // Le decimos al cliente que ponga los datos bajo la etiqueta "file"
@@ -111,7 +107,7 @@ static enum MHD_Result iterate_post(void *coninfo_cls, enum MHD_ValueKind kind,
 
     if (NULL != (fp = fopen(tmp_filename, "rb"))) {
       fclose(fp);
-      con_info->answerstring = fileexistspage;
+      con_info->answerstring = file_exists_response;
       con_info->answercode = MHD_HTTP_FORBIDDEN;
       return MHD_NO;
     }
@@ -120,7 +116,7 @@ static enum MHD_Result iterate_post(void *coninfo_cls, enum MHD_ValueKind kind,
     con_info->tmp_filename = tmp_filename;
 
     if (!con_info->fp) {
-      con_info->answerstring = servererrorpage;
+      con_info->answerstring = server_error_response;
       con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
       return MHD_NO;
     }
@@ -128,13 +124,13 @@ static enum MHD_Result iterate_post(void *coninfo_cls, enum MHD_ValueKind kind,
 
   if (size > 0) {
     if (!fwrite(data, sizeof(char), size, con_info->fp)) {
-      con_info->answerstring = servererrorpage;
+      con_info->answerstring = server_error_response;
       con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
       return MHD_NO;
     }
   }
 
-  con_info->answerstring = completepage;
+  con_info->answerstring = complete_response;
   con_info->answercode = MHD_HTTP_OK;
 
   return MHD_YES;
@@ -197,15 +193,13 @@ void final_processing(struct connection_info_struct *con_info) {
 
     dib = FreeImage_Load(image_format, con_info->tmp_filename, 0);
   } else {
-    printf("image format unknown?\n");
-    con_info->answerstring = errorpage;
+    con_info->answerstring = unrecognized_image_response;
     con_info->answercode = MHD_HTTP_BAD_REQUEST;
     return;
   }
 
   if (dib == NULL) {
-    printf("Couldn't load image\n");
-    con_info->answerstring = servererrorpage;
+    con_info->answerstring = server_error_response;
     con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
     return;
   }
@@ -236,7 +230,7 @@ void final_processing(struct connection_info_struct *con_info) {
 
     break;
   default:
-    con_info->answerstring = servererrorpage;
+    con_info->answerstring = server_error_response;
     con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
     FreeImage_Unload(dib);
     return;
@@ -245,7 +239,7 @@ void final_processing(struct connection_info_struct *con_info) {
   FILE *fp;
   if (NULL != (fp = fopen(full_pathname, "rb"))) {
     fclose(fp);
-    con_info->answerstring = fileexistspage;
+    con_info->answerstring = file_exists_response;
     con_info->answercode = MHD_HTTP_FORBIDDEN;
     return;
   }
@@ -294,7 +288,7 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
 
       con_info->connectiontype = POST;
       con_info->answercode = MHD_HTTP_OK;
-      con_info->answerstring = completepage;
+      con_info->answerstring = complete_response;
     } else
       con_info->connectiontype = GET;
 
@@ -310,7 +304,11 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
 
     if (!(0 == strcmp(url, "/equalize")) &&
         !(0 == strcmp(url, "/classify/rgb"))) {
-      return send_response(connection, errorpage, MHD_HTTP_NOT_FOUND);
+      if (*upload_data_size != 0) {
+        *upload_data_size = 0;
+        return MHD_YES;
+      }
+      return send_response(connection, not_found_response, MHD_HTTP_NOT_FOUND);
     }
 
     struct connection_info_struct *con_info = *con_cls;
@@ -330,5 +328,5 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
     }
   }
 
-  return send_response(connection, errorpage, MHD_HTTP_BAD_REQUEST);
+  return send_response(connection, bad_request_response, MHD_HTTP_BAD_REQUEST);
 }
