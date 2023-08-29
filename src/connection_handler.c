@@ -89,11 +89,11 @@ static enum MHD_Result iterate_post(void *coninfo_cls, enum MHD_ValueKind kind,
 
   struct connection_info_struct *con_info = coninfo_cls;
 
-  // Por default si algo sale mal se devuelve este error
+  // Default return if anything goes unexpectedly horribly wrong
   con_info->answerstring = server_error_response;
   con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
-  // Le decimos al cliente que ponga los datos bajo la etiqueta "file"
+  // The client should put the data under the "file" tag
   if (0 != strcmp(key, "file")) {
     return MHD_NO;
   }
@@ -102,6 +102,12 @@ static enum MHD_Result iterate_post(void *coninfo_cls, enum MHD_ValueKind kind,
 
   // On first iteration
   if (!con_info->fp) {
+    if (filename == NULL) {
+      con_info->answerstring = "Bad Request: filename not provided";
+      con_info->answercode = MHD_HTTP_BAD_REQUEST;
+      return MHD_NO;
+    }
+
     const char *tmp_filename = malloc(strlen(filename) + 2);
     sprintf((char *)tmp_filename, ".%s", filename);
 
@@ -172,6 +178,9 @@ void request_completed(void *cls, struct MHD_Connection *connection,
 void final_processing(struct connection_info_struct *con_info) {
 
   if (con_info->tmp_filename == NULL) {
+    con_info->answerstring =
+        "Bad Request: No file was provided (under 'file' tag)";
+    con_info->answercode = MHD_HTTP_BAD_REQUEST;
     return;
   }
 
@@ -247,6 +256,9 @@ void final_processing(struct connection_info_struct *con_info) {
 
   free((void *)full_pathname);
   FreeImage_Unload(dib);
+
+  con_info->answerstring = complete_response;
+  con_info->answercode = MHD_HTTP_OK;
 }
 
 enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
@@ -254,7 +266,7 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
                                    const char *version, const char *upload_data,
                                    size_t *upload_data_size, void **con_cls) {
 
-  // Primera conexión
+  // First connection inside this if sets stuff up
   if (*con_cls == NULL) {
     printf("%s request for %s using version %s\n", method, url, version);
 
@@ -318,13 +330,17 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
       *upload_data_size = 0;
 
       return MHD_YES;
-    } else if (NULL != con_info->answerstring) {
-
-      // Here do final processing before completing response
-      final_processing(con_info);
-
+    } else if (con_info->answercode != MHD_HTTP_OK) {
       return send_response(connection, con_info->answerstring,
                            con_info->answercode);
+    } else {
+      final_processing(con_info);
+      if (NULL != con_info->answerstring) {
+
+        // Here do final processing before completing response
+        return send_response(connection, con_info->answerstring,
+                             con_info->answercode);
+      }
     }
   }
 
