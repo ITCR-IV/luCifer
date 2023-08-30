@@ -1,7 +1,9 @@
-# Tarea 2
+# luCifer
+
+Este proyecto es para la Tarea 2 del curso Principios de Sistemas Operativos en el segundo semestre del 2023.
 
 ## Requerimientos
-- glibc (para `argp`)
+- glibc (para [`argp`](https://www.gnu.org/software/libc/manual/html_node/Argp.html))
 - Instalar [`libmicrohttpd`](https://www.gnu.org/software/libmicrohttpd/)
 - Instalar [`freeimage`](https://freeimage.sourceforge.io/)
 
@@ -13,20 +15,20 @@ sudo pacman -S libmicrohttpd freeimage
 ## Instrucciones de uso
 
 ### Servidor
-Para compilar el servidor corra el comando `make` estando en la carpeta "root" del proyecto. Luego, para ejecutar el servidor corra de solo corra `./server.exe`.
+Para compilar el servidor corra el comando `make` estando en la carpeta "root" del proyecto. Luego, para ejecutar el servidor corra `./server.exe`.
 
 ### Cliente
 Para enviar imágenes al servidor puede utilizar el cliente `/client/client.sh`.
 
 Para que el cliente funcione debe setear la dirección del servidor a través de la variable de entorno `ADDRESS_URI`.
-Por default la dirección del servidor si se ejecuta localmente será `localhost:1717`, entonces puede ejecutar el cliente con:
+Por default la dirección del servidor, si se ejecuta localmente, será `localhost:1717`. Entonces puede ejecutar el cliente con:
 
 ```
 ADDRESS_URI=localhost:1717 client/client.sh
 ```
 
 #### Cliente en contenedor
-El cliente también se puede usar dentro de un contenedor docker.
+El cliente también se puede usar dentro de un contenedor Docker.
 Si el servidor se está ejecutando localmente, ingrese al folder `client` y ejecute:
 
 ```
