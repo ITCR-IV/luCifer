@@ -1,5 +1,11 @@
 #!/bin/bash
 
+trap ctrl_c INT
+
+function ctrl_c() {
+        exit 130
+}
+
 if [ -z "$ADDRESS_URI" ]; then
 	echo "\$ADDRESS_URI no está seteado, por favor defina esta variable de entorno con la dirección del servidor"
 	exit 1
