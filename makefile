@@ -5,7 +5,7 @@ IDIR=include
 ODIR=obj
 SRCDIR=src
 
-LIBS=-lmicrohttpd -lfreeimage
+LIBS=-lmicrohttpd -lfreeimage -lm
 
 # Headers dentro de include/
 _DEPS = parse.h connection_handler.h process_image.h

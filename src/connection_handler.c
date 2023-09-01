@@ -259,7 +259,12 @@ void final_processing(struct connection_info_struct *con_info) {
 
     break;
   case EQUALIZE_HISTOGRAM:
-    equalize_histogram(dib);
+    if (equalize_histogram(&dib)) {
+      con_info->answerstring = "Bad Request: image format unsupported";
+      con_info->answercode = MHD_HTTP_BAD_REQUEST;
+      FreeImage_Unload(dib);
+      return;
+    }
 
     full_pathname = malloc(strlen(con_info->config->dl_equalizer_path) +
                            strlen(&(con_info->tmp_filename[1])) + 2);

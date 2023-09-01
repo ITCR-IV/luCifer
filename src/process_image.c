@@ -1,6 +1,7 @@
 #include "process_image.h"
 
 #include <FreeImage.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -45,7 +46,73 @@ enum DominantColor get_dominant_color(FIBITMAP *image) {
   exit(5);
 }
 
-void equalize_histogram(FIBITMAP *img) {}
+// This function calculates the cumulative distribution function (cdf) of a
+// histogram, normalizes it to 0-255, and casts it into BYTE
+//
+// in:  histogram, to calculate cdf from
+// out: cdf_LUT, buffer is expected to be 256 items long
+void cdf_lut(DWORD histogram[256], BYTE *cdf_LUT) {
+  // Get cumulative density function
+  size_t cdf[256] = {0};
+
+  // Print histograma
+  // printf("Histograma: [ %d", histogram[0]);
+
+  // for (int i = 1; i < 255; i++) {
+  //   printf(", %08X", histogram[i]);
+  // }
+  // printf(" ]\n");
+
+  cdf[0] = histogram[0];
+  for (size_t i = 1; i < 256; i++) {
+    cdf[i] = cdf[i - 1] + histogram[i];
+  }
+
+  // Normalize it to 255
+  float normalized_cdf[256];
+  float divisor = (float)cdf[255] / 255.0;
+
+  for (size_t i = 0; i < 256; i++) {
+    normalized_cdf[i] = (float)cdf[i] / divisor;
+  }
+
+  // Round
+  for (size_t i = 0; i < 256; i++) {
+    unsigned int whole = (unsigned int)round(normalized_cdf[i]);
+    cdf_LUT[i] = whole;
+  }
+}
+
+int equalize_histogram(FIBITMAP **img) {
+  DWORD histogram[256] = {0};
+  BYTE cdf_LUT[256];
+
+  if (!FreeImage_GetHistogram(*img, histogram, FICC_RED)) {
+    return 1;
+  }
+  cdf_lut(histogram, cdf_LUT);
+  if (!FreeImage_AdjustCurve(*img, cdf_LUT, FICC_RED)) {
+    return 1;
+  }
+
+  if (!FreeImage_GetHistogram(*img, histogram, FICC_BLUE)) {
+    return 1;
+  }
+  cdf_lut(histogram, cdf_LUT);
+  if (!FreeImage_AdjustCurve(*img, cdf_LUT, FICC_BLUE)) {
+    return 1;
+  }
+
+  if (!FreeImage_GetHistogram(*img, histogram, FICC_GREEN)) {
+    return 1;
+  }
+  cdf_lut(histogram, cdf_LUT);
+  if (!FreeImage_AdjustCurve(*img, cdf_LUT, FICC_GREEN)) {
+    return 1;
+  }
+
+  return 0;
+}
 
 const char *get_dominant_color_subdir(enum DominantColor color) {
   switch (color) {
