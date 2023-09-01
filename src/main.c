@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
   FreeImage_Initialise(true);
 
   struct MHD_Daemon *daemon = MHD_start_daemon(
-      MHD_USE_INTERNAL_POLLING_THREAD, config.port, &on_client_connect, NULL,
+      MHD_USE_INTERNAL_POLLING_THREAD, config.port, &on_client_connect, &config,
       &connection_handler, &config, MHD_OPTION_NOTIFY_COMPLETED,
       &request_completed, NULL, MHD_OPTION_END);
 

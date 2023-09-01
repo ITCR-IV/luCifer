@@ -274,30 +274,10 @@ struct configuration parse_conf(struct arguments args) {
         config.port = (uint16_t)port;
 
       } else if (strcmp(key, COLORS_PATH_KEY) == 0) {
-        create_dir(value);
-
-        char *green_dir = malloc(strlen(value) + strlen(GREEN_COLOR_DIR) + 1);
-        char *red_dir = malloc(strlen(value) + strlen(RED_COLOR_DIR) + 1);
-        char *blue_dir = malloc(strlen(value) + strlen(BLUE_COLOR_DIR) + 1);
-
-        sprintf(green_dir, "%s/%s", value, GREEN_COLOR_DIR);
-        sprintf(red_dir, "%s/%s", value, RED_COLOR_DIR);
-        sprintf(blue_dir, "%s/%s", value, BLUE_COLOR_DIR);
-
-        create_dir(green_dir);
-        create_dir(red_dir);
-        create_dir(blue_dir);
-
-        free(green_dir);
-        free(red_dir);
-        free(blue_dir);
-
         config.dl_colors_path = malloc(strlen(value) + 1);
-
         strcpy((char *)config.dl_colors_path, value);
 
       } else if (strcmp(key, EQU_PATH_KEY) == 0) {
-        create_dir(value);
         config.dl_equalizer_path = malloc(strlen(value) + 1);
         strcpy((char *)config.dl_equalizer_path, value);
 
@@ -319,6 +299,38 @@ struct configuration parse_conf(struct arguments args) {
   if (args.specified_port) {
     config.port = args.port;
   }
+
+  /* Check if log file can be written to */
+  FILE *fp;
+  if (NULL != (fp = fopen(config.log_path, "a"))) {
+    fclose(fp);
+  } else {
+    printf("WARNING: Can't open log file %s for writing\n", config.log_path);
+  }
+
+  /* Create or check for colors dirs */
+  create_dir(config.dl_colors_path);
+  char *green_dir =
+      malloc(strlen(config.dl_colors_path) + strlen(GREEN_COLOR_DIR) + 1);
+  char *red_dir =
+      malloc(strlen(config.dl_colors_path) + strlen(RED_COLOR_DIR) + 1);
+  char *blue_dir =
+      malloc(strlen(config.dl_colors_path) + strlen(BLUE_COLOR_DIR) + 1);
+
+  sprintf(green_dir, "%s/%s", config.dl_colors_path, GREEN_COLOR_DIR);
+  sprintf(red_dir, "%s/%s", config.dl_colors_path, RED_COLOR_DIR);
+  sprintf(blue_dir, "%s/%s", config.dl_colors_path, BLUE_COLOR_DIR);
+
+  create_dir(green_dir);
+  create_dir(red_dir);
+  create_dir(blue_dir);
+
+  free(green_dir);
+  free(red_dir);
+  free(blue_dir);
+
+  /* Create or check for equalizer dir */
+  create_dir(config.dl_equalizer_path);
 
   return config;
 }

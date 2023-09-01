@@ -9,6 +9,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <time.h>
 
 #include "parse.h"
 #include "process_image.h"
@@ -52,14 +53,42 @@ enum MHD_Result send_response(struct MHD_Connection *connection,
   return ret;
 }
 
+int log_info(struct configuration *config, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+
+  FILE *fp;
+  if (NULL != (fp = fopen(config->log_path, "a"))) {
+
+    time_t t;
+    time(&t);
+    struct tm *timeinfo = localtime(&t);
+
+    char date_time[64];
+    strftime(date_time, 64, "%Y %m %d %T", timeinfo);
+
+    fprintf(fp, "%s: ", date_time);
+    vfprintf(fp, fmt, args);
+    fprintf(fp, "\n");
+
+    fclose(fp);
+  }
+
+  va_start(args, fmt);
+  int ret = vprintf(fmt, args);
+  printf("\n");
+  va_end(args);
+  return ret;
+}
+
 enum MHD_Result on_client_connect(void *cls, const struct sockaddr *addr,
                                   socklen_t addrlen) {
-  UNUSED(cls);
   UNUSED(addrlen);
 
+  struct configuration *config = cls;
   struct in_addr address = ((struct sockaddr_in *)addr)->sin_addr;
 
-  printf("\nNew client connection with IP: %s\n", inet_ntoa(address));
+  log_info(config, "New client connection with IP: %s", inet_ntoa(address));
 
   return MHD_YES;
 }
@@ -268,7 +297,7 @@ enum MHD_Result connection_handler(void *cls, struct MHD_Connection *connection,
 
   // First connection inside this if sets stuff up
   if (*con_cls == NULL) {
-    printf("%s request for %s using version %s\n", method, url, version);
+    log_info(cls, "%s request for %s using version %s", method, url, version);
 
     struct connection_info_struct *con_info =
         malloc(sizeof(struct connection_info_struct));
