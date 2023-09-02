@@ -54,3 +54,21 @@ Si utiliza el language server `clangd` puede compilar el `compile_commands.json`
 ```
 make clean; bear -- make
 ```
+
+## Instalación
+
+Para instalar el servidor como un servicio de `systemd` puede ejecutar
+```
+make install
+```
+
+Esto creará un ejecutable ImageServer en `/usr/bin` y copiará el archivo
+ImageServer.service a `/usr/lib/systemd/system/`.
+Para que el programa se inicialice en el booteo puede ejecutar:
+```
+systemctl daemon-reload
+systemctl enable ImageServer.service
+```
+
+Finalmente no olvide setear el archivo de configuración del servidor en
+`/etc/ImageServer/config.conf`

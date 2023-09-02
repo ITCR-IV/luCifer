@@ -1,0 +1,12 @@
+[Unit]
+Description=ImageServer
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/ImageServer
+Type=exe
+Restart=always
+
+[Install]
+WantedBy=default.target
+RequiredBy=network.target

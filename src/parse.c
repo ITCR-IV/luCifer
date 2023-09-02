@@ -8,7 +8,7 @@
 #include "process_image.h"
 
 #define DEFAULT_PORT 1717
-#define DEFAULT_CONFIG "/etc/server/config.conf"
+#define DEFAULT_CONFIG "/etc/ImageServer/config.conf"
 #define DEFAULT_COLORS_DIR "colors"
 #define DEFAULT_EQU_DIR "equalized"
 #define DEFAULT_LOG_FILE "/var/log/image-server"
@@ -20,7 +20,7 @@ static char args_doc[] = "";
 static struct argp_option options[] = {
     {"port", 'p', "PORT", 0, "Specify a different port (default: 1717)", 0},
     {"conf", -1, "CONF_FILE", 0,
-     "Specify a configuration file (default: " DEFAULT_CONFIG, 0},
+     "Specify a configuration file (default: " DEFAULT_CONFIG ")", 0},
     {0},
 };
 
@@ -46,6 +46,10 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
 
   case -1:
+    if (arguments->conf_file != NULL) {
+      fclose(arguments->conf_file);
+    }
+
     arguments->conf_file = fopen(arg, "r");
 
     if (arguments->conf_file == NULL) {
@@ -73,8 +77,8 @@ struct arguments parse_args(int argc, char **argv) {
   /* Default values. */
   arguments.port = DEFAULT_PORT;
   arguments.specified_port = false;
-  // Might be NULL
-  arguments.conf_file = fopen("/etc/server/config.conf", "r");
+  // Might be NULL if it doesn't exist which is ok (will use default values)
+  arguments.conf_file = fopen(DEFAULT_CONFIG, "r");
 
   error_t ret = argp_parse(&argp, argc, argv, 0, 0, &arguments);
 

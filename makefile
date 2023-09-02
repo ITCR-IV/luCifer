@@ -22,8 +22,14 @@ $(ODIR)/%.o: $(SRCDIR)/%.c $(DEPS)
 server.exe: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
-.PHONY: clean
+.PHONY: clean install
 
 clean:
 	rm -f $(ODIR)/*.o core *~ $(INCDIR)/*~ 
 	rmdir $(ODIR)
+
+install: server.exe
+	sudo cp server.exe /usr/bin/ImageServer
+	sudo cp ImageServer.service /usr/lib/systemd/system/
+	sudo mkdir -p /etc/ImageServer
+	sudo cp default_config.conf /etc/ImageServer/config.conf

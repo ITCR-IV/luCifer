@@ -1,10 +1,19 @@
+#include <FreeImage.h>
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 
 #include "connection_handler.h"
 #include "parse.h"
+#include "util.h"
 
-#include <FreeImage.h>
+struct MHD_Daemon *mhd_daemon;
+
+void SIGINT_handler(int signal) {
+	UNUSED(signal);
+  MHD_stop_daemon(mhd_daemon);
+	printf("\n");
+}
 
 int main(int argc, char **argv) {
 
@@ -17,23 +26,26 @@ int main(int argc, char **argv) {
   printf("\tColor images dir: %s\n", config.dl_colors_path);
   printf("\tLog file: %s\n\n", config.log_path);
 
-  FreeImage_Initialise(true);
-
-  struct MHD_Daemon *daemon = MHD_start_daemon(
+  mhd_daemon = MHD_start_daemon(
       MHD_USE_INTERNAL_POLLING_THREAD, config.port, &on_client_connect, &config,
       &connection_handler, &config, MHD_OPTION_NOTIFY_COMPLETED,
       &request_completed, NULL, MHD_OPTION_END);
 
-  if (NULL == daemon) {
+  if (NULL == mhd_daemon) {
     fprintf(stderr, "Failed to start server daemon");
     return ECONNREFUSED;
   }
 
-  char c;
-  while ((c = getchar()) != 'q') {
-  }
+  // Register SIGINT (Ctrl-C) handler
+  struct sigaction sigIntHandler;
 
-  FreeImage_DeInitialise();
+  sigIntHandler.sa_handler = SIGINT_handler;
+  sigemptyset(&sigIntHandler.sa_mask);
+  sigIntHandler.sa_flags = 0;
+
+  sigaction(SIGINT, &sigIntHandler, NULL);
+
+  pause();
 
   return 0;
 }
